@@ -12,6 +12,8 @@ env/
 .venv/
 ENV/
 .env
+passenger_wsgi.py
+tmp/
 
 # Pipenv
 Pipfile.lock

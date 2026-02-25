@@ -28,9 +28,9 @@ SECRET_KEY = 'django-insecure-ekmkp5k5zf3q^%6%cv(521m9+5s3-8p)9t#93)ww4*u-qlm2vd
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-#ALLOWED_HOSTS = ['tetratexmchj.uz','www.tetratexmchj.uz']
+ALLOWED_HOSTS = ['tetratexmchj.uz','www.tetratexmchj.uz']
 
-ALLOWED_HOSTS = ['*']
+#ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -82,27 +82,27 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'query_db',
-        'USER': 'postgres',
-        'PASSWORD': '12345678',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
-
 #DATABASES = {
 #    'default': {
 #        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': 'tetratex_farmdb',
-#        'USER': 'tetratex_farmuser',
-#        'PASSWORD': '5136768Mm!',
+#        'NAME': 'query_db',
+#        'USER': 'postgres',
+#        'PASSWORD': '12345678',
 #        'HOST': 'localhost',
 #        'PORT': '5432',
 #    }
 #}
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'tetratex_farmdb',
+        'USER': 'tetratex_farmuser',
+        'PASSWORD': '5136768Mm!',
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
 
 
 
