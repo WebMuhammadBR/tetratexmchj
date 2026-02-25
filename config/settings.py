@@ -28,7 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['tetratexmchj.uz','www.tetratexmchj.uz']
 
 #ALLOWED_HOSTS = ['*']
-
+#11222222222222222222222222222222222222
 # Application definition
 
 INSTALLED_APPS = [
