@@ -173,5 +173,3 @@ SHORT_DATETIME_FORMAT = "d.m.Y H:i"
 
 DATE_INPUT_FORMATS = ["%d.%m.%Y"]
 DATETIME_INPUT_FORMATS = ["%d.%m.%Y %H:%M"]
-
-
