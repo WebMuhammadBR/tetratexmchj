@@ -231,7 +231,7 @@ class WarehouseMovementsAPIView(APIView):
         district_id = request.query_params.get("district_id")
         movement = request.query_params.get("movement")
 
-        if movement not in {"in", "out"}:
+        if movement not in {"in", "out", "report"}:
             return Response([])
 
         if movement == "in":
@@ -258,10 +258,8 @@ class WarehouseMovementsAPIView(APIView):
                 ]
             )
 
-        expense_items = (
-            GoodsGivenDocument.objects
-            .select_related("warehouse", "farmer")
-            .prefetch_related("items__product")
+        expense_items = GoodsGivenDocument.objects.select_related(
+            "warehouse", "farmer", "farmer__massive__district"
         )
 
         if warehouse_id:
@@ -271,14 +269,40 @@ class WarehouseMovementsAPIView(APIView):
         if district_id:
             expense_items = expense_items.filter(farmer__massive__district_id=district_id)
 
-        result = []
+        if movement == "report":
+            rows = (
+                expense_items
+                .values("date", "farmer__massive__district__name")
+                .annotate(quantity=Coalesce(Sum("items__quantity"), Decimal("0.00")))
+                .order_by("-date", "farmer__massive__district__name")
+            )
+            return Response(
+                [
+                    {
+                        "date": row.get("date"),
+                        "district_name": row.get("farmer__massive__district__name") or "-",
+                        "quantity": row.get("quantity") or Decimal("0.00"),
+                    }
+                    for row in rows
+                ]
+            )
+
         rows = (
             expense_items
-            .values("farmer_id", "farmer__name", "farmer__maydon")
+            .values(
+                "id",
+                "date",
+                "number",
+                "farmer__name",
+                "farmer__maydon",
+                "items__product_id",
+                "items__product__name",
+            )
             .annotate(quantity=Coalesce(Sum("items__quantity"), Decimal("0.00")))
-            .order_by("farmer__name")
+            .order_by("-date", "-id", "items__product__name")
         )
 
+        result = []
         for index, row in enumerate(rows, start=1):
             maydon = row.get("farmer__maydon") or Decimal("0.00")
             quantity = row.get("quantity") or Decimal("0.00")
@@ -289,12 +313,12 @@ class WarehouseMovementsAPIView(APIView):
             result.append(
                 {
                     "id": index,
-                    "date": None,
+                    "date": row.get("date"),
                     "warehouse_name": None,
-                    "number": "-",
+                    "number": row.get("number") or "-",
                     "farmer_name": row.get("farmer__name") or "-",
-                    "product_id": None,
-                    "product_name": "-",
+                    "product_id": row.get("items__product_id"),
+                    "product_name": row.get("items__product__name") or "-",
                     "quantity": quantity,
                     "maydon": maydon,
                     "quantity_per_area": quantity_per_area,
