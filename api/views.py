@@ -1,12 +1,12 @@
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Sum, Min, Max, Count, Q
 from django.db.models.functions import Coalesce
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from query.models.bot import BotUser
+from query.models.bot import BotUser, BotUserActivity
 from query.models.counterparties import Farmer
 from query.models.documents import MineralWarehouseReceipt, GoodsGivenDocument, Warehouse
 from .serializers import (
@@ -39,21 +39,30 @@ class FarmerSummaryAPIView(ListAPIView):
     serializer_class = FarmerSummarySerializer
 
     def get_queryset(self):
-        return (
+        contract_type = self.request.query_params.get("contract_type")
+        contract_filter = Q()
+        if contract_type in {"futures", "forward", "storage"}:
+            contract_filter = Q(contracts__contract_type=contract_type)
+
+        queryset = (
             Farmer.objects
             .select_related("massive__district__region")
             .annotate(
                 quantity=Coalesce(
-                    Sum("contracts__planned_quantity"),
+                    Sum("contracts__planned_quantity", filter=contract_filter),
                     Decimal("0.00")
                 ),
                 amount=Coalesce(
-                    Sum("contracts__total_amount"),
+                    Sum("contracts__total_amount", filter=contract_filter),
                     Decimal("0.00")
                 ),
             )
-            .order_by("massive__district__id", "massive__id")
         )
+
+        if contract_type in {"futures", "forward", "storage"}:
+            queryset = queryset.filter(contracts__contract_type=contract_type).distinct()
+
+        return queryset.order_by("massive__district__id", "massive__id")
 
 
 class MineralWarehouseReceiptListAPIView(ListAPIView):
@@ -328,6 +337,75 @@ class WarehouseMovementsAPIView(APIView):
         return Response(result)
 
 
+
+
+class BotUserActivityAnalyticsAPIView(APIView):
+
+    def get(self, request):
+        user_id = request.query_params.get("user_id")
+
+        activities = BotUserActivity.objects.select_related("user")
+        if user_id:
+            activities = activities.filter(user_id=user_id)
+
+        users_summary = []
+        grouped_users = (
+            activities
+            .values("user_id", "user__full_name", "user__telegram_id")
+            .annotate(
+                first_activity=Min("created_at"),
+                last_activity=Max("created_at"),
+                actions_count=Count("id"),
+            )
+            .order_by("user__full_name")
+        )
+
+        for row in grouped_users:
+            first_activity = row.get("first_activity")
+            last_activity = row.get("last_activity")
+            active_seconds = 0
+            if first_activity and last_activity:
+                active_seconds = int((last_activity - first_activity).total_seconds())
+
+            users_summary.append({
+                "user_id": row.get("user_id"),
+                "full_name": row.get("user__full_name") or "-",
+                "telegram_id": row.get("user__telegram_id"),
+                "first_activity": first_activity,
+                "last_activity": last_activity,
+                "actions_count": row.get("actions_count") or 0,
+                "active_seconds": active_seconds,
+            })
+
+        timeline = [
+            {
+                "id": item.id,
+                "user_id": item.user_id,
+                "full_name": item.user.full_name if item.user else "-",
+                "telegram_id": item.user.telegram_id if item.user else None,
+                "action_type": item.action_type,
+                "action_name": item.action_name,
+                "action_payload": item.action_payload,
+                "is_allowed": item.is_allowed,
+                "created_at": item.created_at,
+            }
+            for item in activities.order_by("-created_at")[:500]
+        ]
+
+        by_hour = [
+            {
+                "hour": hour,
+                "actions_count": sum(1 for item in timeline if item["created_at"].hour == hour),
+            }
+            for hour in range(24)
+        ]
+
+        return Response({
+            "users": users_summary,
+            "timeline": timeline,
+            "by_hour": by_hour,
+        })
+
 class BotUserCheckAPIView(APIView):
 
     def post(self, request):
@@ -342,7 +420,50 @@ class BotUserCheckAPIView(APIView):
             }
         )
 
+        if user.full_name != full_name and full_name:
+            user.full_name = full_name
+            user.save(update_fields=["full_name"])
+
+        BotUserActivity.objects.create(
+            user=user,
+            action_type=BotUserActivity.ACTION_SYSTEM,
+            action_name="access_check",
+            action_payload="/start access validation",
+            is_allowed=user.is_active,
+        )
+
         return Response({
             "allowed": user.is_active,
             "created": created
         })
+
+
+class BotUserActivityCreateAPIView(APIView):
+
+    def post(self, request):
+        telegram_id = request.data.get("telegram_id")
+        if not telegram_id:
+            return Response({"created": False}, status=400)
+
+        user = BotUser.objects.filter(telegram_id=telegram_id).first()
+        if not user:
+            return Response({"created": False}, status=404)
+
+        action_type = request.data.get("action_type") or BotUserActivity.ACTION_MESSAGE
+        action_name = (request.data.get("action_name") or "unknown")[:100]
+        action_payload = (request.data.get("action_payload") or "")
+        raw_is_allowed = request.data.get("is_allowed", True)
+        if isinstance(raw_is_allowed, str):
+            is_allowed = raw_is_allowed.strip().lower() in {"1", "true", "yes", "y"}
+        else:
+            is_allowed = bool(raw_is_allowed)
+
+        BotUserActivity.objects.create(
+            user=user,
+            action_type=action_type,
+            action_name=action_name,
+            action_payload=action_payload[:1000],
+            is_allowed=is_allowed,
+        )
+
+        return Response({"created": True})

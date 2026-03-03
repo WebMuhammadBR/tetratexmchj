@@ -6,8 +6,23 @@ from decimal import Decimal
 #=                                                                                                                 =#
 #====================================================================================================================
 class Contract(models.Model):
+    TYPE_FUTURES = "futures"
+    TYPE_FORWARD = "forward"
+    TYPE_STORAGE = "storage"
+    TYPE_CHOICES = (
+        (TYPE_FUTURES, "Фючерс"),
+        (TYPE_FORWARD, "Форвард"),
+        (TYPE_STORAGE, "Сақлаш"),
+    )
+
     farmer = models.ForeignKey(Farmer,on_delete=models.CASCADE,related_name="contracts",verbose_name="Фермер")
     number = models.CharField("Шартнома рақами",max_length=100)
+    contract_type = models.CharField(
+        "Шартнома тури",
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default=TYPE_FUTURES,
+    )
     date = models.DateField("Шартнома санаси")
     planned_quantity = models.DecimalField("Режадаги миқдор (тонна)",max_digits=12,decimal_places=2)
     price = models.DecimalField("1 тонна нархи",max_digits=14,decimal_places=2)
@@ -42,6 +57,5 @@ class Contract(models.Model):
         return f"№-{self.number} от {self.date}"
 
 #========================================================================================
-
 
 

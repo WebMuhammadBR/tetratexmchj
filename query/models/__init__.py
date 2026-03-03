@@ -4,4 +4,4 @@ from .contracts import *
 from .documents import *
 from .accounting import *
 from .cotton import *
-from .bot import BotUser
+from .bot import BotUser, BotUserActivity

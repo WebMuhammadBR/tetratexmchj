@@ -4,6 +4,8 @@ from .views import (
     FarmerListAPIView,
     FarmerSummaryAPIView,
     BotUserCheckAPIView,
+    BotUserActivityCreateAPIView,
+    BotUserActivityAnalyticsAPIView,
     MineralWarehouseReceiptListAPIView,
     GoodsGivenDocumentListAPIView,
     MineralWarehouseTotalsAPIView,
@@ -24,4 +26,6 @@ urlpatterns = [
     path("warehouse/expense-districts/", WarehouseExpenseDistrictsAPIView.as_view()),
     path("warehouse/movements/", WarehouseMovementsAPIView.as_view()),
     path("bot-user/check/", BotUserCheckAPIView.as_view()),
+    path("bot-user/activity/", BotUserActivityCreateAPIView.as_view()),
+    path("bot-user/activity/analytics/", BotUserActivityAnalyticsAPIView.as_view()),
 ]

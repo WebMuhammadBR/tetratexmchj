@@ -7,6 +7,7 @@ class ContractAdmin(admin.ModelAdmin):
         "id",
         "farmer",
         "number",
+        "contract_type",
         "date",
         "planned_quantity",
         "price",
@@ -15,7 +16,7 @@ class ContractAdmin(admin.ModelAdmin):
         "is_active",
     )
 
-    list_filter = ("is_active", "date")
+    list_filter = ("contract_type", "is_active", "date")
     search_fields = ("number", "farmer__name")
     ordering = ("-date",)
 
