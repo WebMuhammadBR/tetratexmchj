@@ -11,6 +11,8 @@ class FarmerSerializer(serializers.ModelSerializer):
         read_only=True
     )
     district = serializers.SerializerMethodField()
+    massive = serializers.SerializerMethodField()
+    contract = serializers.SerializerMethodField()
 
     class Meta:
         model = Farmer
@@ -20,13 +22,26 @@ class FarmerSerializer(serializers.ModelSerializer):
             "inn",
             "maydon",
             "balance",
+            "contract",
             "district",
+            "massive",
         )
 
     def get_district(self, obj):
         massive = obj.massive
         if massive and massive.district:
             return massive.district.name
+        return None
+
+    def get_massive(self, obj):
+        if obj.massive:
+            return obj.massive.name
+        return None
+
+    def get_contract(self, obj):
+        contract = obj.contracts.order_by("-date", "-id").first()
+        if contract:
+            return contract.number
         return None
 
 

@@ -8,7 +8,8 @@ from rest_framework.views import APIView
 
 from query.models.bot import BotUser, BotUserActivity
 from query.models.counterparties import Farmer
-from query.models.documents import MineralWarehouseReceipt, GoodsGivenDocument, Warehouse
+from query.models.documents import MineralWarehouseReceipt, GoodsGivenDocument, GoodsGivenItem, Warehouse
+from query.models.reference import Product
 from .serializers import (
     FarmerSerializer,
     FarmerSummarySerializer,
@@ -21,18 +22,53 @@ from .serializers import (
 class FarmerListAPIView(APIView):
 
     def get(self, request):
+        product_names = list(
+            Product.objects
+            .filter(is_active=True)
+            .order_by("name")
+            .values_list("name", flat=True)
+        )
+
         farmers = (
             Farmer.objects
             .filter(is_active=True)
             .select_related("massive__district__region")
+            .prefetch_related("contracts")
             .order_by(
                 "massive__district__id",
                 "massive__id",
                 "name"
             )
         )
+
         serializer = FarmerSerializer(farmers, many=True)
-        return Response(serializer.data)
+        farmer_rows = serializer.data
+
+        product_totals_by_farmer: dict[int, dict[str, Decimal]] = {}
+        totals_rows = (
+            GoodsGivenItem.objects
+            .filter(document__farmer_id__in=[farmer.id for farmer in farmers])
+            .values("document__farmer_id", "product__name")
+            .annotate(total_amount=Coalesce(Sum("total_with_vat"), Decimal("0.00")))
+        )
+
+        for row in totals_rows:
+            farmer_id = row.get("document__farmer_id")
+            product_name = row.get("product__name") or "-"
+            total_amount = row.get("total_amount") or Decimal("0.00")
+            farmer_totals = product_totals_by_farmer.setdefault(farmer_id, {})
+            farmer_totals[product_name] = total_amount
+
+        for farmer_row in farmer_rows:
+            farmer_id = farmer_row.get("id")
+            product_totals = product_totals_by_farmer.get(farmer_id, {})
+            farmer_row["product_totals"] = {
+                product_name: product_totals.get(product_name, Decimal("0.00"))
+                for product_name in product_names
+            }
+            farmer_row["farmer_total_amount"] = sum(product_totals.values(), Decimal("0.00"))
+
+        return Response(farmer_rows)
 
 
 class FarmerSummaryAPIView(ListAPIView):
@@ -260,6 +296,7 @@ class WarehouseMovementsAPIView(APIView):
                         "product_id": item.product_id,
                         "product_name": item.product.name if item.product else None,
                         "invoice_number": item.invoice_number,
+                        "transport_number": item.transport_number,
                         "bag_count": item.bag_count,
                         "quantity": item.quantity,
                     }
@@ -302,6 +339,8 @@ class WarehouseMovementsAPIView(APIView):
                 "id",
                 "date",
                 "number",
+                "farmer__massive__district__name",
+                "farmer__massive__name",
                 "farmer__name",
                 "farmer__maydon",
                 "items__product_id",
@@ -312,7 +351,7 @@ class WarehouseMovementsAPIView(APIView):
         )
 
         result = []
-        for index, row in enumerate(rows, start=1):
+        for row in rows:
             maydon = row.get("farmer__maydon") or Decimal("0.00")
             quantity = row.get("quantity") or Decimal("0.00")
             quantity_per_area = Decimal("0.00")
@@ -321,10 +360,12 @@ class WarehouseMovementsAPIView(APIView):
 
             result.append(
                 {
-                    "id": index,
+                    "id": row.get("id"),
                     "date": row.get("date"),
                     "warehouse_name": None,
                     "number": row.get("number") or "-",
+                    "district_name": row.get("farmer__massive__district__name") or "-",
+                    "massive_name": row.get("farmer__massive__name") or "-",
                     "farmer_name": row.get("farmer__name") or "-",
                     "product_id": row.get("items__product_id"),
                     "product_name": row.get("items__product__name") or "-",
