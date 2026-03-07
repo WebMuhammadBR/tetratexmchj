@@ -248,6 +248,54 @@ class FarmerSummaryContractTypeFilterAPITest(TestCase):
         self.assertEqual(Decimal(str(response.data[0]['amount'])), Decimal('100000.00'))
 
 
+
+class FarmerSummaryAggregationRegressionAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        region = Region.objects.create(name="Buxoro")
+        district = District.objects.create(region=region, name="G'ijduvon")
+        massive = Massive.objects.create(district=district, name="Massiv-2")
+
+        self.farmer = Farmer.objects.create(
+            name="XOJI SULTON ALI FX",
+            inn="307221416",
+            massive=massive,
+            maydon=Decimal("10.00"),
+        )
+
+        Contract.objects.create(
+            farmer=self.farmer,
+            number="CNT-1",
+            contract_type="forward",
+            date="2026-03-01",
+            planned_quantity=Decimal("5779.00"),
+            price=Decimal("1.00"),
+        )
+        Contract.objects.create(
+            farmer=self.farmer,
+            number="CNT-2",
+            contract_type="forward",
+            date="2026-03-02",
+            planned_quantity=Decimal("16000.00"),
+            price=Decimal("1.00"),
+        )
+        Contract.objects.create(
+            farmer=self.farmer,
+            number="CNT-3",
+            contract_type="forward",
+            date="2026-03-03",
+            planned_quantity=Decimal("112495.00"),
+            price=Decimal("1.00"),
+        )
+
+    def test_summary_does_not_multiply_quantity_when_farmer_has_multiple_same_type_contracts(self):
+        response = self.client.get('/api/farmers/summary/', {'contract_type': 'forward'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(Decimal(str(response.data[0]['quantity'])), Decimal('134274.00'))
+
 class FarmerListAPITest(TestCase):
     def setUp(self):
         self.client = APIClient()

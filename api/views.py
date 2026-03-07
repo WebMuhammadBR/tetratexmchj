@@ -96,7 +96,7 @@ class FarmerSummaryAPIView(ListAPIView):
         )
 
         if contract_type in {"futures", "forward", "storage"}:
-            queryset = queryset.filter(contracts__contract_type=contract_type).distinct()
+            queryset = queryset.filter(quantity__gt=0)
 
         return queryset.order_by("massive__district__id", "massive__id")
 
