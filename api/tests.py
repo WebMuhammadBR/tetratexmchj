@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from rest_framework.test import APIClient
+from tgbot.handlers.mineral import _aggregate_expense_rows_by_farmer
 
 from query.models.bot import BotUser, BotUserActivity
 from query.models.contracts import Contract
@@ -382,3 +383,42 @@ class FarmerListProductTotalsAPITest(TestCase):
         self.assertEqual(Decimal(str(second['product_totals']['Karbamid'])), Decimal('0.00'))
         self.assertEqual(Decimal(str(second['product_totals']['Selitra'])), Decimal('0.00'))
         self.assertEqual(Decimal(str(second['farmer_total_amount'])), Decimal('0.00'))
+
+
+class WarehouseExpenseAggregationTest(TestCase):
+    def test_aggregate_recalculates_quantity_per_area_from_total_quantity(self):
+        rows = [
+            {
+                "district_name": "Yangiyul",
+                "massive_name": "Massiv-1",
+                "farmer_name": "Farmer 1",
+                "product_name": "Selitra",
+                "quantity": 100,
+                "maydon": 1,
+                "quantity_per_area": 100,
+            },
+            {
+                "district_name": "Yangiyul",
+                "massive_name": "Massiv-1",
+                "farmer_name": "Farmer 1",
+                "product_name": "Selitra",
+                "quantity": 100,
+                "maydon": 1,
+                "quantity_per_area": 100,
+            },
+            {
+                "district_name": "Yangiyul",
+                "massive_name": "Massiv-1",
+                "farmer_name": "Farmer 1",
+                "product_name": "Selitra",
+                "quantity": 100,
+                "maydon": 1,
+                "quantity_per_area": 100,
+            },
+        ]
+
+        aggregated = _aggregate_expense_rows_by_farmer(rows)
+
+        self.assertEqual(len(aggregated), 1)
+        self.assertEqual(aggregated[0]["quantity"], 300)
+        self.assertEqual(aggregated[0]["quantity_per_area"], 300)
