@@ -116,8 +116,14 @@ class WarehouseReportMovementsAPITest(TestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["district_name"], "Yangiyul")
         self.assertEqual(response.data[0]["massive_name"], "Massiv-1")
+        self.assertEqual(response.data[0]["inn"], self.farmer.inn)
         self.assertEqual(response.data[0]["farmer_name"], "Farmer 1")
         self.assertEqual(response.data[0]["number"], "YH-10")
+        self.assertEqual(Decimal(str(response.data[0]["price"])), Decimal("1.00"))
+        self.assertEqual(response.data[0]["vat_rate"], "12")
+        self.assertEqual(Decimal(str(response.data[0]["amount"])), Decimal("250.00"))
+        self.assertEqual(Decimal(str(response.data[0]["vat_amount"])), Decimal("30.00"))
+        self.assertEqual(Decimal(str(response.data[0]["total_with_vat"])), Decimal("280.00"))
 
 
 class WarehouseReceiptMovementsAPITest(TestCase):

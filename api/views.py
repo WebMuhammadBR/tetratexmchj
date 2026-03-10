@@ -341,19 +341,25 @@ class WarehouseMovementsAPIView(APIView):
                 "number",
                 "farmer__massive__district__name",
                 "farmer__massive__name",
+                "farmer__inn",
                 "farmer__name",
                 "farmer__maydon",
                 "items__product_id",
                 "items__product__name",
+                "items__quantity",
+                "items__price",
+                "items__vat_rate",
+                "items__amount",
+                "items__vat_amount",
+                "items__total_with_vat",
             )
-            .annotate(quantity=Coalesce(Sum("items__quantity"), Decimal("0.00")))
             .order_by("-date", "-id", "items__product__name")
         )
 
         result = []
         for row in rows:
             maydon = row.get("farmer__maydon") or Decimal("0.00")
-            quantity = row.get("quantity") or Decimal("0.00")
+            quantity = row.get("items__quantity") or Decimal("0.00")
             quantity_per_area = Decimal("0.00")
             if maydon > 0:
                 quantity_per_area = quantity / maydon
@@ -366,10 +372,16 @@ class WarehouseMovementsAPIView(APIView):
                     "number": row.get("number") or "-",
                     "district_name": row.get("farmer__massive__district__name") or "-",
                     "massive_name": row.get("farmer__massive__name") or "-",
+                    "inn": row.get("farmer__inn") or "-",
                     "farmer_name": row.get("farmer__name") or "-",
                     "product_id": row.get("items__product_id"),
                     "product_name": row.get("items__product__name") or "-",
                     "quantity": quantity,
+                    "price": row.get("items__price") or Decimal("0.00"),
+                    "vat_rate": row.get("items__vat_rate") or "0",
+                    "amount": row.get("items__amount") or Decimal("0.00"),
+                    "vat_amount": row.get("items__vat_amount") or Decimal("0.00"),
+                    "total_with_vat": row.get("items__total_with_vat") or Decimal("0.00"),
                     "maydon": maydon,
                     "quantity_per_area": quantity_per_area,
                 }
