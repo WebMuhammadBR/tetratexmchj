@@ -476,3 +476,120 @@ class WarehouseExpenseAggregationTest(TestCase):
         self.assertEqual(len(aggregated), 1)
         self.assertEqual(aggregated[0]["quantity"], 300)
         self.assertEqual(aggregated[0]["quantity_per_area"], 300)
+
+
+class WarehouseSummaryAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+        unit = Unit.objects.create(name="Kilogram", short_name="kg")
+        self.product_1 = Product.objects.create(name="Ammofos", unit=unit)
+        self.product_2 = Product.objects.create(name="Karbamid", unit=unit)
+
+        region = Region.objects.create(name="Samarqand")
+        district = District.objects.create(region=region, name="Urgut")
+        massive = Massive.objects.create(district=district, name="Massiv-7")
+
+        self.farmer = Farmer.objects.create(
+            name="Farmer Summary",
+            inn="111222333",
+            massive=massive,
+            maydon=Decimal("12.00"),
+        )
+        self.contract = Contract.objects.create(
+            farmer=self.farmer,
+            number="CNT-SUM-1",
+            date="2026-01-20",
+            planned_quantity=Decimal("90.00"),
+            price=Decimal("1500.00"),
+        )
+        self.warehouse_1 = Warehouse.objects.create(name="Ombor 1")
+        self.warehouse_2 = Warehouse.objects.create(name="Ombor 2")
+
+    def test_summary_returns_product_columns_rows_and_grand_totals(self):
+        MineralWarehouseReceipt.objects.create(
+            date="2026-02-01",
+            warehouse=self.warehouse_1,
+            product=self.product_1,
+            invoice_number="IN-1",
+            transport_number="01A111AA",
+            bag_count=10,
+            quantity=Decimal("100.00"),
+            price=Decimal("1.00"),
+            amount=Decimal("100.00"),
+        )
+        MineralWarehouseReceipt.objects.create(
+            date="2026-02-02",
+            warehouse=self.warehouse_2,
+            product=self.product_1,
+            invoice_number="IN-2",
+            transport_number="01A222AA",
+            bag_count=12,
+            quantity=Decimal("50.00"),
+            price=Decimal("1.00"),
+            amount=Decimal("50.00"),
+        )
+        MineralWarehouseReceipt.objects.create(
+            date="2026-02-03",
+            warehouse=self.warehouse_2,
+            product=self.product_2,
+            invoice_number="IN-3",
+            transport_number="01A333AA",
+            bag_count=8,
+            quantity=Decimal("80.00"),
+            price=Decimal("1.00"),
+            amount=Decimal("80.00"),
+        )
+
+        doc_1 = GoodsGivenDocument.objects.create(
+            date="2026-02-04",
+            number="OUT-1",
+            farmer=self.farmer,
+            contract=self.contract,
+            warehouse=self.warehouse_1,
+        )
+        GoodsGivenItem.objects.create(
+            document=doc_1,
+            product=self.product_1,
+            quantity=Decimal("25.00"),
+            price=Decimal("1.00"),
+        )
+
+        doc_2 = GoodsGivenDocument.objects.create(
+            date="2026-02-05",
+            number="OUT-2",
+            farmer=self.farmer,
+            contract=self.contract,
+            warehouse=self.warehouse_2,
+        )
+        GoodsGivenItem.objects.create(
+            document=doc_2,
+            product=self.product_2,
+            quantity=Decimal("30.00"),
+            price=Decimal("1.00"),
+        )
+
+        response = self.client.get("/api/warehouse/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["product_name"] for item in response.data["products"]], ["Ammofos", "Karbamid"])
+        self.assertEqual([item["warehouse_name"] for item in response.data["rows"]], ["Ombor 1", "Ombor 2"])
+
+        first_row = response.data["rows"][0]
+        first_product = next(item for item in first_row["products"] if item["product_id"] == self.product_1.id)
+        self.assertEqual(Decimal(str(first_product["total_in"])), Decimal("100.00"))
+        self.assertEqual(Decimal(str(first_product["total_out"])), Decimal("25.00"))
+        self.assertEqual(Decimal(str(first_product["balance"])), Decimal("75.00"))
+
+        totals_product_1 = next(
+            item for item in response.data["totals"]["products"] if item["product_id"] == self.product_1.id
+        )
+        totals_product_2 = next(
+            item for item in response.data["totals"]["products"] if item["product_id"] == self.product_2.id
+        )
+        self.assertEqual(Decimal(str(totals_product_1["total_in"])), Decimal("150.00"))
+        self.assertEqual(Decimal(str(totals_product_1["total_out"])), Decimal("25.00"))
+        self.assertEqual(Decimal(str(totals_product_1["balance"])), Decimal("125.00"))
+        self.assertEqual(Decimal(str(totals_product_2["total_in"])), Decimal("80.00"))
+        self.assertEqual(Decimal(str(totals_product_2["total_out"])), Decimal("30.00"))
+        self.assertEqual(Decimal(str(totals_product_2["balance"])), Decimal("50.00"))

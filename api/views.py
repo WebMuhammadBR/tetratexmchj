@@ -129,6 +129,123 @@ class WarehouseListAPIView(ListAPIView):
         return Warehouse.objects.all().order_by("name")
 
 
+class WarehouseSummaryAPIView(APIView):
+
+    def get(self, request):
+        receipt_rows = (
+            MineralWarehouseReceipt.objects
+            .values("warehouse_id", "warehouse__name", "product_id", "product__name")
+            .annotate(total_in=Coalesce(Sum("quantity"), Decimal("0.00")))
+        )
+        expense_rows = (
+            GoodsGivenItem.objects
+            .values(
+                "document__warehouse_id",
+                "document__warehouse__name",
+                "product_id",
+                "product__name",
+            )
+            .annotate(total_out=Coalesce(Sum("quantity"), Decimal("0.00")))
+        )
+
+        warehouses_map: dict[int, str] = {}
+        products_map: dict[int, str] = {}
+        summary_map: dict[tuple[int, int], dict[str, Decimal]] = {}
+
+        for row in receipt_rows:
+            warehouse_id = row.get("warehouse_id")
+            product_id = row.get("product_id")
+            if not warehouse_id or not product_id:
+                continue
+
+            warehouses_map[warehouse_id] = row.get("warehouse__name") or "-"
+            products_map[product_id] = row.get("product__name") or "-"
+            summary = summary_map.setdefault(
+                (warehouse_id, product_id),
+                {"total_in": Decimal("0.00"), "total_out": Decimal("0.00")},
+            )
+            summary["total_in"] = row.get("total_in") or Decimal("0.00")
+
+        for row in expense_rows:
+            warehouse_id = row.get("document__warehouse_id")
+            product_id = row.get("product_id")
+            if not warehouse_id or not product_id:
+                continue
+
+            warehouses_map[warehouse_id] = row.get("document__warehouse__name") or "-"
+            products_map[product_id] = row.get("product__name") or "-"
+            summary = summary_map.setdefault(
+                (warehouse_id, product_id),
+                {"total_in": Decimal("0.00"), "total_out": Decimal("0.00")},
+            )
+            summary["total_out"] = row.get("total_out") or Decimal("0.00")
+
+        products = [
+            {"product_id": product_id, "product_name": products_map[product_id]}
+            for product_id in sorted(products_map, key=lambda item: products_map[item])
+        ]
+
+        rows = []
+        grand_totals = {
+            product["product_id"]: {
+                "total_in": Decimal("0.00"),
+                "total_out": Decimal("0.00"),
+                "balance": Decimal("0.00"),
+            }
+            for product in products
+        }
+
+        for index, warehouse_id in enumerate(sorted(warehouses_map, key=lambda item: warehouses_map[item]), start=1):
+            warehouse_totals = []
+            for product in products:
+                totals = summary_map.get(
+                    (warehouse_id, product["product_id"]),
+                    {"total_in": Decimal("0.00"), "total_out": Decimal("0.00")},
+                )
+                balance = totals["total_in"] - totals["total_out"]
+                warehouse_totals.append(
+                    {
+                        "product_id": product["product_id"],
+                        "total_in": totals["total_in"],
+                        "total_out": totals["total_out"],
+                        "balance": balance,
+                    }
+                )
+                grand_totals[product["product_id"]]["total_in"] += totals["total_in"]
+                grand_totals[product["product_id"]]["total_out"] += totals["total_out"]
+                grand_totals[product["product_id"]]["balance"] += balance
+
+            rows.append(
+                {
+                    "order": index,
+                    "warehouse_id": warehouse_id,
+                    "warehouse_name": warehouses_map[warehouse_id],
+                    "products": warehouse_totals,
+                }
+            )
+
+        totals_row = {
+            "warehouse_name": "Жами",
+            "products": [
+                {
+                    "product_id": product["product_id"],
+                    "total_in": grand_totals[product["product_id"]]["total_in"],
+                    "total_out": grand_totals[product["product_id"]]["total_out"],
+                    "balance": grand_totals[product["product_id"]]["balance"],
+                }
+                for product in products
+            ],
+        }
+
+        return Response(
+            {
+                "products": products,
+                "rows": rows,
+                "totals": totals_row,
+            }
+        )
+
+
 class MineralWarehouseTotalsAPIView(APIView):
 
     def get(self, request):
