@@ -34,6 +34,16 @@ class FarmerListAPIView(APIView):
             .filter(is_active=True)
             .select_related("massive__district__region")
             .prefetch_related("contracts")
+            .annotate(
+                futures_quantity=Coalesce(
+                    Sum("contracts__planned_quantity", filter=Q(contracts__contract_type="futures")),
+                    Decimal("0.00"),
+                ),
+                futures_amount=Coalesce(
+                    Sum("contracts__total_amount", filter=Q(contracts__contract_type="futures")),
+                    Decimal("0.00"),
+                ),
+            )
             .order_by(
                 "massive__district__id",
                 "massive__id",

@@ -13,6 +13,8 @@ class FarmerSerializer(serializers.ModelSerializer):
     district = serializers.SerializerMethodField()
     massive = serializers.SerializerMethodField()
     contract = serializers.SerializerMethodField()
+    futures_quantity = serializers.DecimalField(max_digits=20, decimal_places=2, read_only=True)
+    futures_amount = serializers.DecimalField(max_digits=20, decimal_places=2, read_only=True)
 
     class Meta:
         model = Farmer
@@ -25,6 +27,8 @@ class FarmerSerializer(serializers.ModelSerializer):
             "contract",
             "district",
             "massive",
+            "futures_quantity",
+            "futures_amount",
         )
 
     def get_district(self, obj):
