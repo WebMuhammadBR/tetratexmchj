@@ -116,6 +116,7 @@ class WarehouseReportMovementsAPITest(TestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["district_name"], "Yangiyul")
         self.assertEqual(response.data[0]["massive_name"], "Massiv-1")
+        self.assertEqual(response.data[0]["warehouse_name"], "Main Warehouse")
         self.assertEqual(response.data[0]["inn"], self.farmer.inn)
         self.assertEqual(response.data[0]["farmer_name"], "Farmer 1")
         self.assertEqual(response.data[0]["number"], "YH-10")

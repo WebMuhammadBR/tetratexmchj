@@ -465,6 +465,7 @@ class WarehouseMovementsAPIView(APIView):
             .values(
                 "id",
                 "date",
+                "warehouse__name",
                 "number",
                 "farmer__massive__district__name",
                 "farmer__massive__name",
@@ -495,7 +496,7 @@ class WarehouseMovementsAPIView(APIView):
                 {
                     "id": row.get("id"),
                     "date": row.get("date"),
-                    "warehouse_name": None,
+                    "warehouse_name": row.get("warehouse__name") or "-",
                     "number": row.get("number") or "-",
                     "district_name": row.get("farmer__massive__district__name") or "-",
                     "massive_name": row.get("farmer__massive__name") or "-",
